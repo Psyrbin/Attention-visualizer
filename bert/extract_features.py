@@ -399,18 +399,37 @@ def main(_):
 
   with codecs.getwriter("utf-8")(tf.gfile.Open(FLAGS.output_file,
                                                "w")) as writer:
+    text_tokens = []
+    results = {}
     for result in estimator.predict(input_fn, yield_single_examples=True):
       print(result['layer_output_0'].shape)
       unique_id = int(result["unique_id"])
       feature = unique_id_to_feature[unique_id]
-      with open('tokens.txt', 'w') as f:
-        for token in feature.tokens:
-          f.write(token + '\n')
+      tok_str = ''
+      for token in feature.tokens:
+        # f.write(token + '\n')
+        tok_str += token + '\n'
+      text_tokens.append(tok_str)
       for (j, layer_index) in enumerate(layer_indexes):
+        if layer_index not in results:
+          results[layer_index] = []
+
         if FLAGS.attention:
-          np.save(FLAGS.output_file + '_layer_' + str(layer_index), result['layer_output_' + str(j)][:,:len(feature.tokens),:len(feature.tokens)])
+          results[layer_index].append(result['layer_output_' + str(j)][:,:len(feature.tokens),:len(feature.tokens)])
+          # np.save(FLAGS.output_file + '_layer_' + str(layer_index), )
         else:
-          np.save(FLAGS.output_file + '_layer_' + str(layer_index), result['layer_output_' + str(j)][:len(feature.tokens),:])
+          results[layer_index].append(result['layer_output_' + str(j)][:len(feature.tokens),:])
+          # np.save(FLAGS.output_file + '_layer_' + str(layer_index), )
+    with open('tokens.txt', 'w') as f:
+      for tok_str in text_tokens:
+          f.write(tok_str + '\n')
+    for layer_index, value in results.items():
+      if len(value) > 1:
+        np.savez(FLAGS.output_file + '_layer_' + str(layer_index), *value)
+      else:
+        np.save(FLAGS.output_file + '_layer_' + str(layer_index), value[0])
+
+
       # output_json = collections.OrderedDict()
       # output_json["linex_index"] = unique_id
       # all_features = []
